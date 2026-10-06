@@ -15,6 +15,7 @@ CREATE DATABASE IF NOT EXISTS museum_collection
 USE museum_collection;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS points_adjustment;
 DROP TABLE IF EXISTS handover;
 DROP TABLE IF EXISTS artifact_attrs;
 DROP TABLE IF EXISTS exhibition_highlights;
@@ -134,6 +135,30 @@ CREATE TABLE member (
     created_at  DATETIME COMMENT '创建时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------------- 会员积分调整申请 ----------------
+-- 状态机：待复核 → 已通过 / 已驳回 / 已撤回（均为终态，不再流转）。
+-- 创建只落单不改积分；复核通过时才同事务更新 member.points 并记录前后积分，
+-- 保证审批记录与会员余额一致。
+CREATE TABLE points_adjustment (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    apply_no      VARCHAR(32) NOT NULL UNIQUE COMMENT '申请单号 PA-2026-001',
+    member_id     BIGINT NOT NULL COMMENT '会员 id',
+    member_no     VARCHAR(32)  COMMENT '会员编号（冗余）',
+    member_name   VARCHAR(32)  COMMENT '会员姓名（冗余）',
+    delta         INT NOT NULL COMMENT '调整值（正加负减）',
+    reason        VARCHAR(256) NOT NULL COMMENT '业务原因',
+    voucher       VARCHAR(128) COMMENT '关联凭据（票据号、活动编号等）',
+    applicant     VARCHAR(32) NOT NULL COMMENT '申请人',
+    status        VARCHAR(16)  COMMENT '待复核 / 已通过 / 已驳回 / 已撤回',
+    reviewer      VARCHAR(32)  COMMENT '复核人',
+    review_note   VARCHAR(512) COMMENT '复核意见',
+    reviewed_at   DATETIME COMMENT '复核时间',
+    points_before INT COMMENT '复核通过前积分（仅已通过时有值）',
+    points_after  INT COMMENT '复核通过后积分（仅已通过时有值）',
+    created_at    DATETIME COMMENT '创建时间',
+    CONSTRAINT fk_pa_member FOREIGN KEY (member_id) REFERENCES member (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- =====================================================================
 -- 种子数据
 -- =====================================================================
@@ -219,3 +244,23 @@ INSERT INTO member (member_no, name, phone, level, joined_at, points, created_at
 ('MB-0003', '王芳', '13800003333', '金卡', '2022-09-20', 7200, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY),
 ('MB-0004', '刘洋', '13800004444', '普通', '2025-01-10', 800,  UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY),
 ('MB-0005', '陈静', '13800005555', '金卡', '2021-11-05', 6500, UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 20 DAY);
+
+-- 积分调整申请：覆盖 已通过 / 待复核 / 已驳回 / 已撤回 四种状态
+-- 已通过的两条与会员当前积分衔接：张伟 800+400=1200、李娜 2000+500=2500
+INSERT INTO points_adjustment (apply_no, member_id, member_no, member_name, delta, reason, voucher, applicant, status,
+    reviewer, review_note, reviewed_at, points_before, points_after, created_at) VALUES
+('PA-2026-001', 1, 'MB-0001', '张伟', 400, '讲解志愿服务积分补录', 'VOL-2026-018', '王敏', '已通过',
+ '李岚', '凭据齐全，同意加分', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 6 DAY, 800, 1200,
+ UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 7 DAY),
+('PA-2026-002', 2, 'MB-0002', '李娜', 500, '年度展览讲解贡献奖励', 'AWD-2026-004', '王敏', '已通过',
+ '李岚', '符合奖励标准', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 5 DAY, 2000, 2500,
+ UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 6 DAY),
+('PA-2026-003', 3, 'MB-0003', '王芳', -200, '特展门票退订扣减积分', 'TKT-8892', '赵敏', '待复核',
+ NULL, NULL, NULL, NULL, NULL,
+ UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 1 DAY),
+('PA-2026-004', 4, 'MB-0004', '刘洋', 1000, '捐赠纪念积分申请', NULL, '赵敏', '已驳回',
+ '李岚', '缺少捐赠凭据，请补充材料后重新申请', UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 3 DAY, NULL, NULL,
+ UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 4 DAY),
+('PA-2026-005', 5, 'MB-0005', '陈静', 300, '讲座签到积分补录', 'LEC-2026-031', '王敏', '已撤回',
+ NULL, NULL, NULL, NULL, NULL,
+ UTC_TIMESTAMP() + INTERVAL 8 HOUR - INTERVAL 2 DAY);

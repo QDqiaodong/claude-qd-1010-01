@@ -94,9 +94,16 @@ public class MemberService {
         return memberRepository.save(existing);
     }
 
+    /**
+     * 直接加减积分（保留给旧调用方）。
+     *
+     * <p>与积分调整复核共用会员行悲观锁：复核通过改积分与本方法互斥排队，
+     * 双方都基于对方已提交的最新积分计算，审批记录的前后积分与会员余额不会错位。</p>
+     */
     @Transactional
     public Member addPoints(Long id, int delta) {
-        Member existing = get(id);
+        Member existing = memberRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BizException("会员不存在：" + id));
         int newPoints = existing.getPoints() + delta;
         if (newPoints < 0) {
             throw new BizException("积分扣减后不能为负");
