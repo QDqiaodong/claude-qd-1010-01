@@ -62,5 +62,13 @@ export default {
   listMembers: (level) => call(http.get('/members', params(level ? { level } : {}))),
   createMember: (d) => call(http.post('/members', d)),
   updateMember: (id, d) => call(http.put(`/members/${id}`, d)),
-  addPoints: (id, delta) => call(http.post(`/members/${id}/points`, null, params({ delta })))
+  addPoints: (id, delta) => call(http.post(`/members/${id}/points`, null, params({ delta }))),
+
+  // ---------------- 积分调整申请 ----------------
+  listPointAdjustments: (filter) => call(http.get('/point-adjustments', params(filter || {}))),
+  createPointAdjustment: (d) => call(http.post('/point-adjustments', d)),
+  updatePointAdjustment: (id, d) => call(http.put(`/point-adjustments/${id}`, d)),
+  withdrawPointAdjustment: (id, operator) => call(http.post(`/point-adjustments/${id}/withdraw`, null, params({ operator }))),
+  approvePointAdjustment: (id, reviewer, comment) => call(http.post(`/point-adjustments/${id}/approve`, null, params({ reviewer, comment }))),
+  rejectPointAdjustment: (id, reviewer, comment) => call(http.post(`/point-adjustments/${id}/reject`, null, params({ reviewer, comment })))
 }

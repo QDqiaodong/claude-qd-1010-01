@@ -96,7 +96,9 @@ public class MemberService {
 
     @Transactional
     public Member addPoints(Long id, int delta) {
-        Member existing = get(id);
+        // 锁会员行：与「积分调整复核通过」互斥，避免并发变动互相覆盖导致余额与审批记录不一致
+        Member existing = memberRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BizException("会员不存在：" + id));
         int newPoints = existing.getPoints() + delta;
         if (newPoints < 0) {
             throw new BizException("积分扣减后不能为负");

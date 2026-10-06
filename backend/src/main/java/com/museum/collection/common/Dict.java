@@ -52,6 +52,13 @@ public final class Dict {
 
     public static final int GOLD_POINTS = 6000;
 
+    // ---------------- 积分调整申请 ----------------
+    /** 待复核 → 已通过 / 已驳回 / 已撤回（后三者为终态，不可再处理） */
+    public static final List<String> POINT_ADJUST_STATUSES = List.of("待复核", "已通过", "已驳回", "已撤回");
+
+    /** 申请待复核状态：仅该状态可撤回 / 修正 / 复核 */
+    public static final String POINT_ADJUST_PENDING = "待复核";
+
     // ---------------- 取值方法 ----------------
 
     public static boolean isValidArtifactStatus(String status) {
